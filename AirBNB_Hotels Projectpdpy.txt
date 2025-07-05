@@ -1,0 +1,167 @@
+AirBNB case study
+
+#Importing the dataset
+#Checking the qulity of data & cleaning
+
+import pandas as pd
+
+# Shape
+print("Shape of dataset:", df.shape)
+
+# First few rows
+print(df.head())
+
+# Info
+df.info()
+
+# Descriptive stats
+print(df.describe())
+
+# Missing values
+missing = df.isnull().sum()
+missing_percent = (missing / len(df)) * 100
+missing_data = pd.DataFrame({'Missing Values': missing, 'Percentage': missing_percent})
+print(missing_data[missing_data['Missing Values'] > 0])
+
+# Duplicates
+print("Duplicate rows:", df.duplicated().sum())
+
+# Unique values per column
+print("Unique value count per column:\n", df.nunique())
+
+# Invalid checks
+print("Prices < 0:\n", df[df['price'] < 0])
+print("Minimum nights < 1:\n", df[df['minimum_nights'] < 1])
+print("Negative reviews_per_month:\n", df[df['reviews_per_month'] < 0])
+
+------------------------------
+Case study que
+--1.Which type of hosts should airbnb acquire more ? where?
+✅ Step 1: Define Successful Hosts
+# Filter active listings with decent availability and reviews
+successful_hosts = df[
+    (df['number_of_reviews'] > 50) &
+    (df['reviews_per_month'] >= 1.0) &
+    (df['calculated_host_listing_count'] >= 2) &
+    (df['availability_365'] > 150)
+]
+
+print("Total successful host listings:", successful_hosts.shape[0])
+successful_hosts.head()
+✅ Step 2: Get Unique Successful Hosts
+# Get distinct successful hosts
+top_hosts = successful_hosts[['host_id', 'host_name']].drop_duplicates()
+print("Number of successful hosts:", top_hosts.shape[0])
+✅ Step 3: Analyze Their Listing Characteristics
+# Analyze room types and pricing of successful hosts
+listing_stats = successful_hosts.groupby('room_type').agg({
+    'price': ['mean', 'max', 'min'],
+    'number_of_reviews': 'mean',
+    'reviews_per_month': 'mean'
+}).round(2)
+
+print("Characteristics of listings by successful hosts:")
+print(listing_stats)
+✅ Step 4: Identify Top Neighborhoods Where Popular Hosts Are Located
+# Count listings per neighborhood by successful hosts
+top_neighborhoods = successful_hosts['neighbourhood_group'].value_counts().head(10)
+
+print("Top neighborhoods where successful hosts are located:")
+print(top_neighborhoods)
+--------------------------------------
+--2 Which neighbourhood should be targeted for growth?
+✅ Python Code to Analyze Growth
+🔢 Step 1: Estimate Revenue
+# Estimate revenue = number of reviews × price
+df['estimated_revenue'] = df['number_of_reviews'] * df['price']
+📊 Step 2: Analyze Growth by Year (using last_review)
+# Extract year from last_review
+df['review_year'] = pd.DatetimeIndex(df['last_review']).year
+
+# Group by year: count listings, total reviews, total estimated revenue
+growth_by_year = df.groupby('review_year').agg({
+    'id': 'count',
+    'number_of_reviews': 'sum',
+    'estimated_revenue': 'sum'
+}).rename(columns={
+    'id': 'number_of_listings',
+    'number_of_reviews': 'total_reviews',
+    'estimated_revenue': 'total_estimated_revenue'
+}).dropna().astype(int)
+
+growth_by_year
+--------------------------------
+--3 What are prefered pricing ranges for customers?
+✅ Python/Pandas Code to Define Price Ranges
+🔹 Step 1: Remove Obvious Outliers
+# Filter out listings with extreme price values (e.g., > $1000)
+df_filtered = df[df['price'] <= 1000]
+🔹 Step 2: Define Price Ranges Based on Quartiles
+# Calculate quartiles
+price_quartiles = df_filtered['price'].quantile([0, 0.25, 0.5, 0.75, 1.0])
+print("Price quartiles:\n", price_quartiles)
+
+# Function to categorize price range
+def get_price_range(price):
+    if price <= price_quartiles[0.25]:
+        return 'Low'
+    elif price <= price_quartiles[0.5]:
+        return 'Mid-Low'
+    elif price <= price_quartiles[0.75]:
+        return 'Mid-High'
+    else:
+        return 'High'
+
+# Apply function
+df_filtered['price_range'] = df_filtered['price'].apply(get_price_range)
+🔹 Step 3: Price Ranges by Room Type 
+# Analyze how price ranges distribute across room types
+price_by_room_type = df_filtered.groupby(['room_type', 'price_range']).size().unstack(fill_value=0)
+
+print("Price range distribution by room type:")
+print(price_by_room_type)
+--------------------------------
+--4 What are various types of properties that align with customer preferences?
+
+-which type of property feature would you like to consider while analysing customer preferences
+Step 1: Prepare Data
+# Filter valid data (no zero price, valid reviews)
+df_pref = df[
+    (df['price'] > 0) & 
+    (df['number_of_reviews'] > 0) & 
+    (df['reviews_per_month'] >= 0)
+].copy()
+Step 2: Analyze Popularity by Room Type
+room_popularity = df_pref.groupby('room_type').agg({
+    'number_of_reviews': 'mean',
+    'reviews_per_month': 'mean',
+    'price': 'mean'
+}).round(2)
+
+print("Popularity by Room Type:")
+print(room_popularity)
+Step 3: Neighborhood Preference
+top_neigh = df_pref.groupby('neighbourhood_group').agg({
+    'number_of_reviews': 'sum',
+    'price': 'mean',
+    'reviews_per_month': 'mean'
+}).sort_values(by='number_of_reviews', ascending=False).round(2)
+
+print("Top preferred neighborhoods:")
+print(top_neigh)
+Step 4: Availability vs Popularity
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(8,6))
+sns.scatterplot(data=df_pref, x='availability_365', y='number_of_reviews', hue='room_type')
+plt.title('Availability vs Number of Reviews')
+plt.xlabel('Availability (days)')
+plt.ylabel('Number of Reviews')
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+---------------------------------
+
+
+
